@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Doc ⇄ PDF Converter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div class="bg-white p-8 rounded shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Document Converter</h1>
+    <form id="convertForm" class="space-y-4">
+      <input type="file" id="fileInput" required class="block w-full p-2 border rounded" />
+      <select id="targetFormat" class="w-full p-2 border rounded">
+        <option value="pdf">Convert to PDF</option>
+        <option value="docx">Convert to DOCX</option>
+        <option value="txt">Convert to TXT</option>
+      </select>
+      <button type="submit" class="bg-blue-600 text-white p-2 w-full rounded hover:bg-blue-700">Convert</button>
+    </form>
+    <div id="result" class="mt-4 text-center text-green-600 hidden"></div>
+  </div>
+
+  <script>
+    const API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiY2MzMDRiZTUxMTU4MzNlYTBkM2I1YzRiODcwMDc0MGU3ZDM5NTQwZWE3ZWMxMjdmMDY1MTBhMjc3MGMxMmQzODI1N2U3ZGM2YWEwOTVhZTciLCJpYXQiOjE3NDc2NzEyODguNDA3MDM3LCJuYmYiOjE3NDc2NzEyODguNDA3MDM4LCJleHAiOjQ5MDMzNDQ4ODguNDAxMjI3LCJzdWIiOiI3MTk3Mjc2MiIsInNjb3BlcyI6W119.Kwp1JW358mNm7zd_
