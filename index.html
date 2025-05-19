@@ -1,76 +1,129 @@
-try {
-  const createJobRes = await fetch('https://api.cloudconvert.com/v2/jobs', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      tasks: {
-        'upload-my-file': {
-          operation: 'import/upload'
-        },
-        'convert-my-file': {
-          operation: 'convert',
-          input: 'upload-my-file',
-          input_format: inputFormat,
-          output_format: targetFormat
-        },
-        'export-my-file': {
-          operation: 'export/url',
-          input: 'convert-my-file'
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>Doc ⇄ PDF Converter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div class="bg-white p-8 rounded shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Document Converter</h1>
+    <form id="convertForm" class="space-y-4">
+      <input type="file" id="fileInput" required class="block w-full p-2 border rounded" />
+      <select id="targetFormat" class="w-full p-2 border rounded">
+        <option value="pdf">Convert to PDF</option>
+        <option value="docx">Convert to DOCX</option>
+        <option value="txt">Convert to TXT</option>
+      </select>
+      <button type="submit" class="bg-blue-600 text-white p-2 w-full rounded hover:bg-blue-700">Convert</button>
+    </form>
+    <div id="result" class="mt-4 text-center text-green-600 hidden"></div>
+  </div>
+
+  <script>
+    const API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiY2MzMDRiZTUxMTU4MzNlYTBkM2I1YzRiODcwMDc0MGU3ZDM5NTQwZWE3ZWMxMjdmMDY1MTBhMjc3MGMxMmQzODI1N2U3ZGM2YWEwOTVhZTciLCJpYXQiOjE3NDc2NzEyODguNDA3MDM3LCJuYmYiOjE3NDc2NzEyODguNDA3MDM4LCJleHAiOjQ5MDMzNDQ4ODguNDAxMjI3LCJzdWIiOiI3MTk3Mjc2MiIsInNjb3BlcyI6W119.Kwp1JW358mNm7zdnekBVpLT6A6bv0HOhpTT--O2fpM4cB66T9DhHvot-D_EImB48uuk5qgkbwZazgyM3PyVneUBsIjQivZLA4cMpThX7bweL_YQqgGC4VrOAgmUZrz7lvcUvRhZUdubWYyc8eTvYqbZykRly2qEyO0g0Tx_3WKeVtGhNImG8s_WngPtu2DDKkpRFtHoHdGLxVqZj-_8KaSMHcPle_ifN15j6Xjc3-sCkufG8CaZ489rARMgVtJ3HnGlN2DZlLDy7tlqRFmHQFGEZR7zGX8AwTkJ4Ap7sUc30_qG46drAkWHn_5vasqDMPKjWNmHmpCIX4CqX_DXJd57yVIZqw0lHnvPQCjy5z-Nu3y6hVuJANSfugkTUYNa0FpGBnJnRnafFepJRGFly5IaKhOef-kdEJravi7hAaZapHrRgtRIr0izTP0hfd8BryB1-RdXRPgC0SEu-vht13PwavaO8_l0vG15ShizaKnhVT7SEfrqvulmqKZ0gmSIdME7RDqZnRgFeEqcUklZTwbsjoHtyJc81_Ucx5dqaicBV24-axLEk5ew4qJjyHslM7I57IL7WD-YO9RdcNH6ZBjtNBYlDQyPt_2JhwpS_dt-3neXlnsZNXrQrQie7VPAhUiAAkl_AYJ3WJK-ES2CCa5camO9In2K-Gnxg9Hixu60';
+
+    const form = document.getElementById('convertForm');
+    const result = document.getElementById('result');
+    const button = form.querySelector('button[type="submit"]');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById('fileInput');
+      const file = fileInput.files[0];
+      const targetFormat = document.getElementById('targetFormat').value;
+
+      if (!file) return alert('Please select a file');
+
+      button.disabled = true;
+      result.textContent = '⏳ Uploading and converting...';
+      result.classList.remove('hidden');
+
+      const inputFormat = file.name.split('.').pop().toLowerCase();
+
+      try {
+        // Create conversion job
+        const createJobRes = await fetch('https://api.cloudconvert.com/v2/jobs', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            tasks: {
+              'upload-my-file': {
+                operation: 'import/upload'
+              },
+              'convert-my-file': {
+                operation: 'convert',
+                input: 'upload-my-file',
+                input_format: inputFormat,
+                output_format: targetFormat
+              },
+              'export-my-file': {
+                operation: 'export/url',
+                input: 'convert-my-file'
+              }
+            }
+          })
+        });
+
+        const jobData = await createJobRes.json();
+        if (!jobData.data) throw new Error('Job creation failed');
+
+        // Find upload task and get upload url/form
+        const uploadTask = jobData.data.tasks.find(task => task.name === 'upload-my-file');
+        if (!uploadTask || !uploadTask.result || !uploadTask.result.form) throw new Error('Upload task missing');
+
+        const uploadUrl = uploadTask.result.form.url;
+        const uploadParams = uploadTask.result.form.parameters;
+
+        // Prepare form data for file upload
+        const uploadForm = new FormData();
+        for (const key in uploadParams) {
+          uploadForm.append(key, uploadParams[key]);
         }
+        uploadForm.append('file', file);
+
+        // Upload file
+        await fetch(uploadUrl, {
+          method: 'POST',
+          body: uploadForm
+        });
+
+        // Poll job status until finished
+        let finished = false;
+        let jobStatusData;
+        while (!finished) {
+          await new Promise(r => setTimeout(r, 2000));
+          const statusRes = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobData.data.id}`, {
+            headers: { 'Authorization': `Bearer ${API_KEY}` }
+          });
+          jobStatusData = await statusRes.json();
+
+          const status = jobStatusData.data.status;
+          if (status === 'finished') {
+            finished = true;
+          } else if (status === 'error') {
+            throw new Error('Conversion failed');
+          }
+        }
+
+        // Get export task and file URL
+        const exportTask = jobStatusData.data.tasks.find(task => task.name === 'export-my-file');
+        if (!exportTask || !exportTask.result || !exportTask.result.files || exportTask.result.files.length === 0) {
+          throw new Error('Export file not found');
+        }
+
+        const fileUrl = exportTask.result.files[0].url;
+
+        result.innerHTML = `✅ Conversion complete: <a href="${fileUrl}" class="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Download file</a>`;
+      } catch (err) {
+        result.textContent = '❌ Error: ' + err.message;
+      } finally {
+        button.disabled = false;
       }
-    })
-  });
-
-  const jobData = await createJobRes.json();
-  if (!jobData.data) throw new Error('Job creation failed');
-
-  // Find upload task
-  const uploadTask = jobData.data.tasks.find(task => task.name === 'upload-my-file');
-  if (!uploadTask || !uploadTask.result || !uploadTask.result.form) throw new Error('Upload task missing');
-
-  const uploadUrl = uploadTask.result.form.url;
-  const uploadParams = uploadTask.result.form.parameters;
-
-  const uploadForm = new FormData();
-  for (const key in uploadParams) {
-    uploadForm.append(key, uploadParams[key]);
-  }
-  uploadForm.append('file', file);
-
-  await fetch(uploadUrl, {
-    method: 'POST',
-    body: uploadForm
-  });
-
-  // Poll job status
-  let finished = false;
-  let jobStatusData;
-  while (!finished) {
-    await new Promise(r => setTimeout(r, 2000));
-    const statusRes = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobData.data.id}`, {
-      headers: { 'Authorization': `Bearer ${API_KEY}` }
     });
-    jobStatusData = await statusRes.json();
-
-    const status = jobStatusData.data.status;
-    if (status === 'finished') {
-      finished = true;
-    } else if (status === 'error') {
-      throw new Error('Conversion failed');
-    }
-  }
-
-  // Get export task from updated job data
-  const exportTask = jobStatusData.data.tasks.find(task => task.name === 'export-my-file');
-  if (!exportTask || !exportTask.result || !exportTask.result.files || exportTask.result.files.length === 0) {
-    throw new Error('Export file not found');
-  }
-
-  const fileUrl = exportTask.result.files[0].url;
-  result.innerHTML = `✅ Conversion complete: <a href="${fileUrl}" class="text-blue-600 underline" target="_blank" rel="noopener noreferrer">Download file</a>`;
-} catch (err) {
-  result.textContent = '❌ Error: ' + err.message;
-}
+  </script>
+</body>
+</html>
