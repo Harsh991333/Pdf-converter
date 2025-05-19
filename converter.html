@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Doc ⇄ PDF Converter</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div class="bg-white p-8 rounded shadow-lg w-full max-w-md">
+    <h1 class="text-2xl font-bold mb-4 text-center">Document Converter</h1>
+    <form id="convertForm" class="space-y-4">
+      <input type="file" id="fileInput" required class="block w-full p-2 border rounded" />
+      <select id="targetFormat" class="w-full p-2 border rounded">
+        <option value="pdf">Convert to PDF</option>
+        <option value="docx">Convert to DOCX</option>
+        <option value="txt">Convert to TXT</option>
+      </select>
+      <button type="submit" class="bg-blue-600 text-white p-2 w-full rounded hover:bg-blue-700">Convert</button>
+    </form>
+    <div id="result" class="mt-4 text-center text-green-600 hidden"></div>
+  </div>
+
+  <script>
+    const API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiIxIiwianRpIjoiMjE0MTM0OGY5MjljYjJjZTJiZDQyZmMzMThjZTk2M2ZmMDgxOTg0Yjc0YTMyZTViM2M2ODYwMGIwOWI5ZTQ2ZTM3MDNiZTFhYTQ0ODdjMWIiLCJpYXQiOjE3NDc2NjkwMTEuMjU1MDMsIm5iZiI6MTc0NzY2OTAxMS4yNTUwMzEsImV4cCI6NDkwMzM0MjYxMS4yNTIxMTcsInN1YiI6IjcxOTcyNzYyIiwic2NvcGVzIjpbXX0.RFkKM8vkjUu6O6cZaOlQK2GVY1deoIdz8gtM1Ijr7yzNkWZzO_PE6Q5T-_CKvHB7bJsf3MVjd1PnPHiWsTOPARi4tymnfETYLiZI1c-VZsvZTaoKjfZuwrGt0A5d4pV58dy4QMrBIS7ISzoQl01XAP8_9A1-kd03HvwJ_D0Wy9zzcZfwbHEGEbKb7kdNDHSwp2MokeH3qd-rHD_40H6RcD0rDhqxOwSxvSZp9uupetdolj44Rp8Ta8buWg9PYVj_i0C08o084HwhKCJ1taImC3TjCx3_BjXWMbz4KhB9Am_A1-p1oFE4xYeCsod98ku-9vfAO7skgPiuhiITDyJ_1SzDo9BU7ZEmxjSMQQOHFHKjHwFvEiZ55CgsYhgbL_bEqzK6Er5yhS59-e8IWKnch4s4VSX3lDV1pyJfSbxrq3Ilv6ERXrUUTbRt775uZjvpbxqKY0hmPWhe1EMN1XJQQha4TBh4U4yNH_nQqSR3DceqrwpoW7klyL1zIbopvyqo1I9kRTNJn9VZH49may9N4uoTtCIlCRLiR-j3kmGs3zXUDA_MZcyPvp3SllwaKV1YN8oiaCTo7bJALrE3eGrwcYSBONZY9MhzxgCcFae97Zp1tdwHkuGCZ_4Rvb07P93lzdQBuzPG4-9PDfjRs-JK8RPX11KPPNedHVlnstnKJ7k';
+
+    const form = document.getElementById('convertForm');
+    const result = document.getElementById('result');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const file = document.getElementById('fileInput').files[0];
+      const targetFormat = document.getElementById('targetFormat').value;
+
+      if (!file) return alert('Please select a file');
+
+      result.textContent = '⏳ Uploading and converting...';
+      result.classList.remove('hidden');
+
+      const inputFormat = file.name.split('.').pop();
+
+      try {
+        const createJobRes = await fetch('https://api.cloudconvert.com/v2/jobs', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            tasks: {
+              'upload-my-file': {
+                operation: 'import/upload'
+              },
+              'convert-my-file': {
+                operation: 'convert',
+                input: 'upload-my-file',
+                input_format: inputFormat,
+                output_format: targetFormat
+              },
+              'export-my-file': {
+                operation: 'export/url',
+                input: 'convert-my-file'
+              }
+            }
+          })
+        });
+
+        const jobData = await createJobRes.json();
+        const uploadTask = Object.values(jobData.data.tasks).find(task => task.name === 'upload-my-file');
+        const uploadUrl = uploadTask.result.form.url;
+        const uploadParams = uploadTask.result.form.parameters;
+
+        const uploadForm = new FormData();
+        for (const key in uploadParams) {
+          uploadForm.append(key, uploadParams[key]);
+        }
+        uploadForm.append('file', file);
+
+        await fetch(uploadUrl, {
+          method: 'POST',
+          body: uploadForm
+        });
+
+        let jobStatus = null;
+        while (true) {
+          const res = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobData.data.id}`, {
+            headers: { 'Authorization': `Bearer ${API_KEY}` }
+          });
+          const statusData = await res.json();
+          jobStatus = statusData.data.status;
+          if (jobStatus === 'finished') break;
+          if (jobStatus === 'error') throw new Error('Conversion failed');
+          await new Promise(r => setTimeout(r, 2000));
+        }
+
+        const exportTask = jobData.data.tasks.find(t => t.name === 'export-my-file');
+        const fileUrl = exportTask.result.files[0].url;
+
+        result.innerHTML = `✅ Conversion complete: <a href="${fileUrl}" class="text-blue-600 underline" target="_blank">Download file</a>`;
+      } catch (err) {
+        result.textContent = '❌ Error: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
